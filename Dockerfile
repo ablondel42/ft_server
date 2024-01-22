@@ -1,0 +1,63 @@
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Dockerfile                                         :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: ablondel <ablondel@student.s19.be>         +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2020/08/27 22:17:54 by vvarodi           #+#    #+#              #
+#    Updated: 2021/01/18 10:39:20 by ablondel         ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+FROM debian:buster
+
+ENV AUTOINDEX on
+
+RUN apt-get update && apt-get install -y \
+    nginx \
+    mariadb-server \
+    php-fpm \
+    php-mysql \
+    php-mbstring \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# NGINX
+RUN     echo "daemon off;" >> /etc/nginx/nginx.conf && \ 
+        rm var/www/html/index.nginx-debian.html
+COPY	srcs/nginx/*.conf /tmp/
+#COPY   /srcs/nginx/server.conf /etc/nginx/sites-available/server.conf
+#RUN    ln -s /etc/nginx/sites-available/server.conf /etc/nginx/sites-enabled/server.conf
+#RUN    rm -rf /etc/nginx/sites-enabled/default
+
+# PHPMYADMIN
+RUN wget https://files.phpmyadmin.net/phpMyAdmin/5.0.2/phpMyAdmin-5.0.2-english.tar.gz && \
+    tar -xzvf phpMyAdmin-5.0.2-english.tar.gz && \
+    mv phpMyAdmin-5.0.2-english/ /var/www/html/phpmyadmin && \
+    rm -rf phpMyAdmin-5.0.2-english.tar.gz
+COPY srcs/phpmyadmin/config.inc.php /var/www/html/phpmyadmin
+
+# WordPress
+RUN wget https://wordpress.org/latest.tar.gz && \
+    tar -xzvf latest.tar.gz && \
+    mv wordpress /var/www/html/ && \
+    rm -rf latest.tar.gz
+COPY srcs/wordpress/wp-config.php /var/www/html/wordpress
+
+# SLL
+RUN mkdir ~/mkcert && cd ~/mkcert && \
+	wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.1/mkcert-v1.4.1-linux-amd64 && \
+	mv mkcert-v1.4.1-linux-amd64 mkcert && chmod +x mkcert && \
+	./mkcert -install && ./mkcert localhost
+
+# Giving nginx's user-group rights over page files
+RUN	chown -R www-data:www-data /var/www/html/*
+
+# Scripts: start.sh && change_index.sh
+COPY srcs/*.sh ./
+
+# Ports that needs to be exposed at run time with -p [host port]:[container port]
+EXPOSE 80 443
+
+CMD bash start.sh
